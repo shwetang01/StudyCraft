@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { QuizQuestion } from '@/lib/types';
+import { sounds } from '@/lib/soundEffects';
 
 interface QuizEngineProps {
   initialQuestions: QuizQuestion[];
@@ -52,41 +53,7 @@ export function QuizEngine({ initialQuestions, onUpdateQuizProgress }: QuizEngin
 
   const currentQ = activeSet[currentIndex] || activeSet[0];
 
-  const handleSelectOption = (index: number) => {
-    if (isAnswerRevealed) return; // Prevent changing after answer reveal
-    setSelectedOption(index);
-    setIsAnswerRevealed(true);
-
-    const isCorrect = index === currentQ.correctAnswerIndex;
-
-    // Update in active set
-    const updatedActive = [...activeSet];
-    updatedActive[currentIndex] = {
-      ...currentQ,
-      userAnswerIndex: index,
-    };
-    setActiveSet(updatedActive);
-
-    // Also update in master questions list
-    const updatedMaster = questions.map((q) => (q.id === currentQ.id ? updatedActive[currentIndex] : q));
-    setQuestions(updatedMaster);
-    onUpdateQuizProgress?.(updatedMaster);
-
-    // Trigger mini confetti on correct answer
-    if (isCorrect) {
-      try {
-        confetti({
-          particleCount: 25,
-          spread: 40,
-          origin: { y: 0.7 },
-        });
-      } catch {
-        // Safe if canvas-confetti is not loaded
-      }
-    }
-  };
-
-  const handleNextQuestion = () => {
+  const handleNextQuestion = React.useCallback(() => {
     if (currentIndex + 1 < activeSet.length) {
       setCurrentIndex((prev) => prev + 1);
       setSelectedOption(null);
@@ -108,7 +75,82 @@ export function QuizEngine({ initialQuestions, onUpdateQuizProgress }: QuizEngin
         }
       }
     }
-  };
+  }, [currentIndex, activeSet]);
+
+  const handleSelectOption = React.useCallback(
+    (index: number) => {
+      if (isAnswerRevealed || !currentQ) return; // Prevent changing after answer reveal
+      setSelectedOption(index);
+      setIsAnswerRevealed(true);
+
+      const isCorrect = index === currentQ.correctAnswerIndex;
+
+      // Update in active set
+      const updatedActive = [...activeSet];
+      updatedActive[currentIndex] = {
+        ...currentQ,
+        userAnswerIndex: index,
+      };
+      setActiveSet(updatedActive);
+
+      // Also update in master questions list
+      const updatedMaster = questions.map((q) => (q.id === currentQ.id ? updatedActive[currentIndex] : q));
+      setQuestions(updatedMaster);
+      onUpdateQuizProgress?.(updatedMaster);
+
+      // Trigger feedback sounds and mini confetti on answer
+      if (isCorrect) {
+        sounds.playCorrect();
+        try {
+          confetti({
+            particleCount: 25,
+            spread: 40,
+            origin: { y: 0.7 },
+          });
+        } catch {
+          // Safe if canvas-confetti is not loaded
+        }
+      } else {
+        sounds.playWrong();
+      }
+    },
+    [isAnswerRevealed, currentQ, currentIndex, activeSet, questions, onUpdateQuizProgress]
+  );
+
+  // Keyboard navigation for quiz options (1-4, A-D) and advancing (Enter, Space)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+
+      if (isQuizCompleted) return;
+
+      if (!isAnswerRevealed) {
+        const key = e.key.toLowerCase();
+        if (key === '1' || key === 'a') {
+          e.preventDefault();
+          handleSelectOption(0);
+        } else if (key === '2' || key === 'b') {
+          e.preventDefault();
+          handleSelectOption(1);
+        } else if (key === '3' || key === 'c') {
+          e.preventDefault();
+          handleSelectOption(2);
+        } else if (key === '4' || key === 'd') {
+          e.preventDefault();
+          handleSelectOption(3);
+        }
+      } else {
+        if (e.code === 'Enter' || e.code === 'Space' || e.code === 'ArrowRight') {
+          e.preventDefault();
+          handleNextQuestion();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAnswerRevealed, isQuizCompleted, handleSelectOption, handleNextQuestion]);
 
   // Re-Test Wrong Answers Mode (PDF Explicit Requirement!)
   const handleStartRetestWrongAnswers = () => {
@@ -322,6 +364,28 @@ export function QuizEngine({ initialQuestions, onUpdateQuizProgress }: QuizEngin
               </button>
             </div>
           </div>
+        )}
+      </div>
+
+      {/* Keyboard Shortcuts Hint */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '16px',
+          marginTop: '12px',
+          fontSize: '0.74rem',
+          color: 'var(--text-muted)',
+        }}
+      >
+        <span>
+          <kbd style={{ padding: '2px 5px', borderRadius: '4px', background: 'var(--bg-tertiary)' }}>1-4</kbd> or{' '}
+          <kbd style={{ padding: '2px 5px', borderRadius: '4px', background: 'var(--bg-tertiary)' }}>A-D</kbd> Select Option
+        </span>
+        {isAnswerRevealed && (
+          <span>
+            <kbd style={{ padding: '2px 5px', borderRadius: '4px', background: 'var(--bg-tertiary)' }}>Enter</kbd> Next Question
+          </span>
         )}
       </div>
     </div>

@@ -45,12 +45,22 @@ export interface GenerateRequestBody {
     quizCount?: number;
   };
   simulationMode?: ResilienceSimulationMode;
+  apiKeyOverride?: {
+    gemini?: string;
+    groq?: string;
+    openai?: string;
+  };
 }
 
 export interface RefineRequestBody {
   currentSession: StudySession;
   refinementInstruction: string;
   simulationMode?: ResilienceSimulationMode;
+  apiKeyOverride?: {
+    gemini?: string;
+    groq?: string;
+    openai?: string;
+  };
 }
 
 export type ResilienceSimulationMode =

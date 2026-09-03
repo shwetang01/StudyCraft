@@ -68,10 +68,10 @@ export async function generateStudySession(
     await new Promise((resolve) => setTimeout(resolve, 8000));
   }
 
-  // Check for available real API keys
-  const geminiKey = process.env.GEMINI_API_KEY?.trim();
-  const groqKey = process.env.GROQ_API_KEY?.trim();
-  const openaiKey = process.env.OPENAI_API_KEY?.trim();
+  // Check for available real API keys (via request override or server env)
+  const geminiKey = body.apiKeyOverride?.gemini?.trim() || process.env.GEMINI_API_KEY?.trim();
+  const groqKey = body.apiKeyOverride?.groq?.trim() || process.env.GROQ_API_KEY?.trim();
+  const openaiKey = body.apiKeyOverride?.openai?.trim() || process.env.OPENAI_API_KEY?.trim();
 
   let rawContent = '';
   let modelUsed = 'Intelligent Deterministic Mock Engine';
@@ -208,8 +208,8 @@ export async function refineStudySession(
     };
   }
 
-  const geminiKey = process.env.GEMINI_API_KEY?.trim();
-  const groqKey = process.env.GROQ_API_KEY?.trim();
+  const geminiKey = body.apiKeyOverride?.gemini?.trim() || process.env.GEMINI_API_KEY?.trim();
+  const groqKey = body.apiKeyOverride?.groq?.trim() || process.env.GROQ_API_KEY?.trim();
 
   let rawContent = '';
   let modelUsed = 'Intelligent Refinement Engine';

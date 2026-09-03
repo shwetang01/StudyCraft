@@ -98,6 +98,7 @@ export function useAIGenerator() {
         const payload: GenerateRequestBody = {
           prompt,
           simulationMode,
+          apiKeyOverride,
         };
 
         const res = await fetch('/api/generate', {
@@ -163,6 +164,7 @@ export function useAIGenerator() {
           currentSession: session,
           refinementInstruction,
           simulationMode,
+          apiKeyOverride,
         };
 
         const res = await fetch('/api/refine', {
@@ -203,6 +205,40 @@ export function useAIGenerator() {
     [session, persistToHistory]
   );
 
+  const cancelGeneration = useCallback(() => {
+    if (activeAbortControllerRef.current) {
+      activeAbortControllerRef.current.abort();
+      activeAbortControllerRef.current = null;
+    }
+    setIsGenerating(false);
+    setIsRefining(false);
+  }, []);
+
+  const [apiKeyOverride, setApiKeyOverride] = useState<{
+    gemini?: string;
+    groq?: string;
+    openai?: string;
+  } | undefined>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem('studycraft_api_keys');
+        return saved ? JSON.parse(saved) : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
+  });
+
+  const saveApiKeys = useCallback((keys: { gemini?: string; groq?: string; openai?: string }) => {
+    setApiKeyOverride(keys);
+    try {
+      sessionStorage.setItem('studycraft_api_keys', JSON.stringify(keys));
+    } catch {
+      // Ignored
+    }
+  }, []);
+
   const retry = useCallback(() => {
     if (lastSubmittedPromptRef.current) {
       generate(lastSubmittedPromptRef.current);
@@ -228,9 +264,12 @@ export function useAIGenerator() {
     isRefining,
     error,
     metaInfo,
+    apiKeyOverride,
+    saveApiKeys,
     generate,
     refine,
     retry,
+    cancelGeneration,
     clearSession,
     loadSession,
     updateSession,

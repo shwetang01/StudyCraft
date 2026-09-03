@@ -12,6 +12,7 @@ import {
   Award,
 } from 'lucide-react';
 import { Flashcard } from '@/lib/types';
+import { sounds } from '@/lib/soundEffects';
 
 interface FlashcardDeckProps {
   cards: Flashcard[];
@@ -35,6 +36,7 @@ export function FlashcardDeck({ cards, onUpdateCardStatus }: FlashcardDeckProps)
 
   const handleFlip = useCallback(() => {
     setIsFlipped((prev) => !prev);
+    sounds.playFlip();
   }, []);
 
   const handleNext = useCallback(() => {
