@@ -24,10 +24,8 @@ import { FlashcardDeck } from '@/components/FlashcardDeck';
 import { QuizEngine } from '@/components/QuizEngine';
 import { ConceptsChecklist } from '@/components/ConceptsChecklist';
 import { RefinementInput } from '@/components/RefinementInput';
-import { ResilienceSandbox } from '@/components/ResilienceSandbox';
 import { SavedSessionsModal } from '@/components/SavedSessionsModal';
 import { ApiKeyModal } from '@/components/ApiKeyModal';
-import { AssignmentBriefModal } from '@/components/AssignmentBriefModal';
 import { useAIGenerator } from '@/hooks/useAIGenerator';
 
 type ActiveTab = 'flashcards' | 'quiz' | 'checklist' | 'analytics';
@@ -60,10 +58,8 @@ export default function HomePage() {
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('flashcards');
   const [viewMode, setViewMode] = useState<'tabbed' | 'all'>('tabbed');
-  const [isSandboxOpen, setIsSandboxOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isApiKeyOpen, setIsApiKeyOpen] = useState(false);
-  const [isBriefOpen, setIsBriefOpen] = useState(false);
   const [loadingStepIdx, setLoadingStepIdx] = useState(0);
 
   // Cycle loading ticker steps smoothly
@@ -113,10 +109,8 @@ export default function HomePage() {
   return (
     <div className="app-container">
       <Header
-        onOpenSandbox={() => setIsSandboxOpen(true)}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onOpenApiKey={() => setIsApiKeyOpen(true)}
-        onOpenBrief={() => setIsBriefOpen(true)}
         hasCustomKey={hasCustomKey}
         modelUsed={metaInfo?.modelUsed}
       />
@@ -206,14 +200,13 @@ export default function HomePage() {
         <div style={{ maxWidth: '960px', margin: '48px auto 0' }}>
           <div style={{ textAlign: 'center', marginBottom: '28px' }}>
             <span className="brand-badge" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>
-              Architecture & Interactive Tools
+              How It Works
             </span>
             <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginTop: '6px' }}>
-              Designed for Unpredictable AI Outputs
+              Built for Active Recall & Concept Mastery
             </h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '600px', margin: '6px auto 0' }}>
-              Unlike generic chatbots, StudyCraft converts natural text into strict, validated JSON schemas
-              that feed stateful interactive components.
+              Paste your raw lecture notes, article excerpts, or any topic to instantly generate structured, interactive study materials.
             </p>
           </div>
 
@@ -244,7 +237,7 @@ export default function HomePage() {
                 3D Interactive Flashcards
               </h3>
               <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                Flip cards with Spacebar, navigate with arrow keys, rate confidence (*Need Practice* vs *Mastered*), and shuffle.
+                Flip cards with Spacebar, navigate with arrow keys, rate confidence (Need Practice vs Mastered), and shuffle decks.
               </p>
             </div>
 
@@ -289,7 +282,7 @@ export default function HomePage() {
                 <Zap size={18} />
               </div>
               <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '6px' }}>
-                Re-Test Wrong Answers
+                Re-Test Missed Questions
               </h3>
               <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                 Dedicated workflow isolating only incorrect responses into a targeted sub-quiz to achieve 100% concept mastery.
@@ -313,10 +306,10 @@ export default function HomePage() {
                 <BrainCircuit size={18} />
               </div>
               <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '6px' }}>
-                Crash-Proof Resilience
+                Progress & Key Concepts
               </h3>
               <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                Dirty JSON auto-repair, Zod schema healing, and AbortController race-condition prevention ensuring UI never crashes.
+                Interactive topic checklist tracking your comprehension milestones and curriculum completion in real time.
               </p>
             </div>
           </div>
@@ -510,14 +503,6 @@ export default function HomePage() {
         </main>
       )}
 
-      {/* Resilience Sandbox Chaos Testing Drawer */}
-      <ResilienceSandbox
-        isOpen={isSandboxOpen}
-        onClose={() => setIsSandboxOpen(false)}
-        onSimulate={(mode) => generate('Chaos Resilience Test Trigger', mode)}
-        isLoading={isGenerating}
-      />
-
       {/* Saved Sessions Modal */}
       <SavedSessionsModal
         isOpen={isHistoryOpen}
@@ -531,12 +516,6 @@ export default function HomePage() {
         onClose={() => setIsApiKeyOpen(false)}
         savedKeys={apiKeyOverride}
         onSaveKeys={saveApiKeys}
-      />
-
-      {/* Assignment Brief Modal */}
-      <AssignmentBriefModal
-        isOpen={isBriefOpen}
-        onClose={() => setIsBriefOpen(false)}
       />
     </div>
   );

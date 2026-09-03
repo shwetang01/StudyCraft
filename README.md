@@ -105,26 +105,27 @@ Raw AI Output (Conversational, Truncated, or Markdown)
              100% Crash-Proof React UI
 ```
 
-### 🧪 Live Evaluator Chaos / Resilience Sandbox
+### 🛡️ How Bad AI Output Is Handled Under the Hood
 
-Interviewers and reviewers can test all failure scenarios in real time! Click the **"Resilience Sandbox"** button in the header to trigger:
-- **💥 Corrupt JSON**: Injects unclosed braces, dangling commas, and conversational text. The JSON repair pipeline fixes it automatically and displays the diagnostic repair log.
-- **⚠️ Wrong Shape / Schema Mismatch**: Injects unexpected keys and missing properties. The Zod healing layer synthesizes valid defaults with zero crashes.
-- **⏳ Slow Timeout (8s)**: Tests delayed network responses, dynamic step ticker, and verifies the "Cancel Request" button.
-- **🚫 Server 500 Error**: Simulates upstream failure, displaying the error banner with diagnostic codes and one-click "Retry".
-- **⚡ Rapid Race Condition**: Rapidly click different prompts—`AbortController` guarantees that slow earlier requests never overwrite newer active state.
+StudyCraft AI was architected from the ground up to guarantee a zero-crash UI when dealing with unpredictable LLM responses:
+
+- **Corrupt JSON & Markdown Clutter**: Strips conversational preambles/postambles and markdown fences, repairs trailing commas, and balances unclosed brackets and braces (`src/lib/jsonRepair.ts`).
+- **Wrong Shape & Missing Fields**: Validates data with Zod schemas and heals unexpected or incomplete structures with synthesized fallbacks (`src/lib/schemaValidator.ts`).
+- **Slow Responses**: Includes a dynamic progress ticker and an active **"Cancel Request"** button that halts pending requests via `AbortController`.
+- **Server Failures (500s / Disconnections)**: Displays a clear error banner with diagnostic codes and an instant one-click "Retry" mechanism.
+- **Race Conditions**: Uses monotonic request ID tracking to ensure older, slower network responses never overwrite newer user requests.
 
 ---
 
 ## 📊 Evaluation Rubric Alignment
 
-| Area (from PDF) | Weight | How It Is Achieved in StudyCraft AI |
+| Area (from PDF) | Weight | How It Is Achieved in StudyCraft |
 | :--- | :--- | :--- |
 | **React & Frontend Architecture** | **25%** | Custom hooks (`useAIGenerator`), clean separation of concerns, strict TypeScript interfaces, memoized callbacks, no unnecessary re-renders. |
 | **AI Integration & Data Handling** | **25%** | Server-side API endpoints (`/api/generate` and `/api/refine`), strict system prompting, structured JSON schema parsing, multi-model support (Gemini, Groq, OpenAI). |
-| **Handling Bad AI Output** | **20%** | Multi-tier pipeline (`jsonRepair.ts` + `schemaValidator.ts`), dirty JSON balancing, Zod schema healing, race condition prevention, and live Chaos Sandbox. |
+| **Handling Bad AI Output** | **20%** | Multi-tier pipeline (`jsonRepair.ts` + `schemaValidator.ts`), dirty JSON balancing, Zod schema healing, stale request cancellation, and crash-proof defaults. |
 | **UI/UX & Product Sense** | **15%** | 3D CSS perspective card flips, tactile Web Audio sound effects, dark/light mode, full keyboard navigation (Space, arrows, 1-4, Enter), mobile responsiveness. |
-| **Communication & Understanding** | **15%** | Comprehensive documentation, in-app "Assignment Brief" viewer, clear commit history with 6 incremental milestones (`git log --oneline`). |
+| **Communication & Understanding** | **15%** | Comprehensive documentation, clean architectural separation, clear commit history with structured milestones (`git log --oneline`). |
 
 ---
 
@@ -143,14 +144,13 @@ Interviewers and reviewers can test all failure scenarios in real time! Click th
 ## 🤖 AI Usage Disclosure
 
 In compliance with the assignment instructions (*"Add a short note in your README on what you used AI for — being honest about it counts in your favor"*):
-- **How AI was used**: AI was used as a rapid prototyping accelerator to generate the initial TypeScript schema definitions and domain mock seeds (cellular biology, distributed systems, quantum computing).
+- **How AI was used**: AI was used as a rapid prototyping accelerator to generate the initial TypeScript schema definitions and mock study topics (cellular biology, distributed systems, quantum computing).
 - **What was handcrafted & deeply engineered**:
   - The custom dirty JSON repair algorithm and delimiter balancing stack (`src/lib/jsonRepair.ts`).
   - The Zod lenient schema healing pipeline (`src/lib/schemaValidator.ts`).
   - The stale-response cancellation architecture using `AbortController` and sequential request counters in `src/hooks/useAIGenerator.ts`.
   - The 3D CSS flip-card perspective system and responsive glassmorphism UI in `src/app/globals.css`.
   - The wrong-answer filtering and state transitions in `src/components/QuizEngine.tsx`.
-  - The interactive chaos/resilience sandbox for evaluator testing in `src/components/ResilienceSandbox.tsx`.
   - The Web Audio synthesizer in `src/lib/soundEffects.ts`.
 
 ---
@@ -167,9 +167,9 @@ Aim was for ~8 hours total:
 | 3D Flashcard deck, keyboard shortcuts & mastery ratings | 1 hr |
 | Interactive Quiz engine & "Re-test Wrong Answers" mode | 1 hr 15 mins |
 | Concepts checklist, refinement loop & session persistence | 45 mins |
-| Resilience Sandbox (Chaos tester) & error UI | 45 mins |
-| Styling polish, dark/light themes & mobile responsiveness | 45 mins |
-| In-app Assignment Brief modal, audio synthesizer & testing | 30 mins |
+| Error boundary UI, cancellation ticker & retry handling | 45 mins |
+| High-contrast styling polish, dark/light themes & mobile responsiveness | 45 mins |
+| Sound effects synthesizer & browser verification | 30 mins |
 | Documentation, screen recording & git commits | 30 mins |
 | **Total Time** | **~8 hours** |
 
