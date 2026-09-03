@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Moon, Sun, ShieldAlert, History, Key, Volume2, VolumeX } from 'lucide-react';
+import { Sparkles, Moon, Sun, ShieldAlert, History, Key, Volume2, VolumeX, FileText } from 'lucide-react';
 import { sounds } from '@/lib/soundEffects';
 
 interface HeaderProps {
   onOpenSandbox: () => void;
   onOpenHistory: () => void;
   onOpenApiKey: () => void;
+  onOpenBrief: () => void;
   hasCustomKey?: boolean;
   modelUsed?: string;
 }
@@ -16,6 +17,7 @@ export function Header({
   onOpenSandbox,
   onOpenHistory,
   onOpenApiKey,
+  onOpenBrief,
   hasCustomKey,
   modelUsed,
 }: HeaderProps) {
@@ -58,6 +60,17 @@ export function Header({
       </div>
 
       <div className="header-actions">
+        {/* Assignment Brief Modal Trigger */}
+        <button
+          className="btn"
+          onClick={onOpenBrief}
+          title="View Assignment PDF Brief, Requirements & Evaluation Rubric"
+          style={{ borderColor: 'rgba(99, 102, 241, 0.4)', color: 'var(--accent-primary)' }}
+        >
+          <FileText size={16} />
+          <span>Assignment Brief</span>
+        </button>
+
         {/* Chaos / Resilience Sandbox Trigger */}
         <button
           className="btn"

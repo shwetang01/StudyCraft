@@ -27,6 +27,7 @@ import { RefinementInput } from '@/components/RefinementInput';
 import { ResilienceSandbox } from '@/components/ResilienceSandbox';
 import { SavedSessionsModal } from '@/components/SavedSessionsModal';
 import { ApiKeyModal } from '@/components/ApiKeyModal';
+import { AssignmentBriefModal } from '@/components/AssignmentBriefModal';
 import { useAIGenerator } from '@/hooks/useAIGenerator';
 
 type ActiveTab = 'flashcards' | 'quiz' | 'checklist' | 'analytics';
@@ -62,6 +63,7 @@ export default function HomePage() {
   const [isSandboxOpen, setIsSandboxOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isApiKeyOpen, setIsApiKeyOpen] = useState(false);
+  const [isBriefOpen, setIsBriefOpen] = useState(false);
   const [loadingStepIdx, setLoadingStepIdx] = useState(0);
 
   // Cycle loading ticker steps smoothly
@@ -114,6 +116,7 @@ export default function HomePage() {
         onOpenSandbox={() => setIsSandboxOpen(true)}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onOpenApiKey={() => setIsApiKeyOpen(true)}
+        onOpenBrief={() => setIsBriefOpen(true)}
         hasCustomKey={hasCustomKey}
         modelUsed={metaInfo?.modelUsed}
       />
@@ -528,6 +531,12 @@ export default function HomePage() {
         onClose={() => setIsApiKeyOpen(false)}
         savedKeys={apiKeyOverride}
         onSaveKeys={saveApiKeys}
+      />
+
+      {/* Assignment Brief Modal */}
+      <AssignmentBriefModal
+        isOpen={isBriefOpen}
+        onClose={() => setIsBriefOpen(false)}
       />
     </div>
   );
