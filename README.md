@@ -8,11 +8,13 @@ Built for the **Frontend Internship Assignment** (Flam).
 
 ## 📹 Screen Recording Demonstration
 
-Per the assignment submission instructions (*"A short screen recording showing the app working"*), a complete walkthrough demonstration has been recorded and included directly in this repository:
+Per the assignment submission instructions (*"A short screen recording showing the app working"*), a complete animated walkthrough demonstration of the finished application is embedded below and included directly in this repository:
 
-▶️ **[View / Download Screen Recording (demo_recording.webp)](./demo_recording.webp)**
+![StudyCraft Interactive Walkthrough Demo](./demo_recording.webp)
 
-*(The recording demonstrates 3D card flips, keyboard navigation, quiz option scoring, "Re-Test Wrong Answers" mode, multi-block canvas view, and live corruption auto-repair in the Resilience Sandbox).*
+*(The demonstration showcases: Dark/Light mode toggle with high-contrast text, the streamlined consumer header, topic synthesis, 3D perspective card flips, keyboard-assisted quiz evaluation with immediate explanations, and the Multi-Block continuous canvas view).*
+
+▶️ **[Direct File Link: demo_recording.webp](./demo_recording.webp)**
 
 ---
 
