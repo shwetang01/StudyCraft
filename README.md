@@ -129,15 +129,115 @@ StudyCraft AI was architected from the ground up to guarantee a zero-crash UI wh
 
 ---
 
-## 🛠️ Tech Stack & Architecture
+## 🏛️ System Architecture & Tech Stack
 
-- **Framework**: Next.js 15 (App Router) + React 19
-- **Type Safety**: Strict TypeScript
-- **Schema Validation**: Zod runtime parsing & lenient coercion
-- **Styling**: Handcrafted modern Vanilla CSS (Glassmorphism, custom 3D flip card transforms, CSS variables, dark/light themes, zero external CSS bloat)
-- **Audio Feedback**: Synthesized Web Audio API sound effects (no external asset dependencies)
-- **State Management**: React Hooks (`useAIGenerator`, `useState`, `useCallback`, `useRef`, `useEffect`) + LocalStorage persistence
-- **Icons & Polish**: Lucide React, Canvas Confetti
+StudyCraft is structured as a **decoupled, event-driven React client with a resilient serverless AI gateway**. Every component is designed around fault isolation, unidirectional state flow, and deterministic UI rendering.
+
+### 📐 End-to-End Architectural Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   CLIENT LAYER (React 19)                                   │
+│                                                                                             │
+│   [ User Input / Presets ] ───► useAIGenerator Hook                                         │
+│                                      │                                                      │
+│                                      ├─► AbortController (Cancels stale in-flight requests) │
+│                                      ├─► Request ID Sequencer (Prevents race conditions)    │
+│                                      └─► LocalStorage Syncer (Persists active sessions)     │
+└──────────────────────────────────────┬──────────────────────────────────────────────────────┘
+                                       │ POST { prompt, simulationMode }
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│                           SERVERLESS API GATEWAY (Next.js 15 App Router)                    │
+│                                                                                             │
+│   /api/generate  &  /api/refine                                                             │
+│   ├── Key Isolation: LLM secrets remain on the server; never exposed to browser bundles      │
+│   └── Multi-Provider Router: Gemini 2.5 Flash / Groq Llama 3 / OpenAI GPT-4o / Local Engine │
+└──────────────────────────────────────┬──────────────────────────────────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│                         DEFENSIVE INGESTION & DATA REPAIR PIPELINE                          │
+│                                                                                             │
+│   1. Markdown Fence Stripper  ──► Removes ```json fences & conversational preambles         │
+│   2. Dirty JSON Repair Stack  ──► Auto-balances unclosed delimiters & trims trailing commas │
+│   3. Zod Schema Validation    ──► Type-checks & auto-heals missing keys or corrupt indices  │
+└──────────────────────────────────────┬──────────────────────────────────────────────────────┘
+                                       │ Validated & Healed StudySession JSON
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│                             INTERACTIVE STATEFUL UI BLOCKS                                  │
+│                                                                                             │
+│   ├── FlashcardDeck.tsx      ──► 3D hardware-accelerated CSS perspective & Spacebar flips   │
+│   ├── QuizEngine.tsx         ──► Keyboard selection (1-4, Enter) & wrong-answer re-testing  │
+│   ├── ConceptsChecklist.tsx  ──► Milestone tracking & completion percentage calculation     │
+│   └── soundEffects.ts        ──► Zero-latency synthesized Web Audio sound synthesizer       │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 📂 Directory Structure & Module Responsibilities
+
+```
+Flam_Frontend/
+├── public/
+│   └── demo_recording.webp       # Demonstration recording for evaluators
+├── src/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── generate/route.ts # Serverless POST endpoint for full session synthesis
+│   │   │   └── refine/route.ts   # Serverless POST endpoint for iterative session mutation
+│   │   ├── globals.css           # Vanilla CSS tokens, 3D perspective, light/dark themes
+│   │   ├── layout.tsx            # Root HTML metadata, font configuration, ambient backdrops
+│   │   └── page.tsx              # Root orchestration view: Tabbed vs Full Canvas coordinator
+│   ├── components/
+│   │   ├── ApiKeyModal.tsx       # In-browser evaluator modal for custom LLM key testing
+│   │   ├── ConceptsChecklist.tsx # Interactive checkable topic mastery checklist
+│   │   ├── FlashcardDeck.tsx     # 3D interactive flip deck with arrow key navigation
+│   │   ├── Header.tsx            # Consumer navigation, theme switcher, sound & history controls
+│   │   ├── InputSection.tsx      # Prompt textarea, curated preset chips, character counter
+│   │   ├── QuizEngine.tsx        # Adaptive testing, keyboard shortcuts, Re-Test Wrong Answers
+│   │   ├── RefinementInput.tsx   # Follow-up conversational prompt interface
+│   │   └── SavedSessionsModal.tsx# LocalStorage history viewer and session restore drawer
+│   ├── hooks/
+│   │   └── useAIGenerator.ts     # Generation state machine, AbortController, persistence
+│   └── lib/
+│       ├── aiProvider.ts         # Multi-LLM caller & intelligent deterministic mock engine
+│       ├── jsonRepair.ts         # Delimiter balancing stack & malformed JSON sanitizer
+│       ├── schemaValidator.ts    # Zod runtime parsing & schema auto-healing defaults
+│       ├── soundEffects.ts       # Synthesized Web Audio API sound generator
+│       └── types.ts              # Strict TypeScript domain models & request contracts
+├── package.json                  # Next 15, React 19, Zod, Lucide, Canvas Confetti
+└── README.md                     # Complete project documentation & audit guide
+```
+
+---
+
+### ⚙️ Technology Stack Justification
+
+| Technology | Role | Why It Was Chosen |
+| :--- | :--- | :--- |
+| **Next.js 15 (App Router)** | Framework | Provides high-performance React Server Components and native serverless route handlers (`/api/*`), fulfilling the core assignment mandate that API keys must never be shipped to the client browser. |
+| **React 19** | View Layer | Functional components and modern React hooks (`useState`, `useCallback`, `useRef`, `useEffect`) manage localized interactive state across multiple independent blocks without requiring heavyweight global store libraries like Redux. |
+| **Strict TypeScript** | Type Safety | Enforces strict domain contracts for `StudySession`, `Flashcard`, and `QuizQuestion`. Guarantees compile-time consistency across API payloads and React prop trees. |
+| **Zod** | Runtime Validation | AI model outputs cannot be verified by compile-time TypeScript alone. Zod provides dynamic runtime parsing with custom lenient coercion, guaranteeing zero undefined property access crashes in the UI. |
+| **Handcrafted Vanilla CSS** | Styling System | Avoids CSS framework bloat and provides granular control over hardware-accelerated 3D perspective transforms (`perspective: 1400px; transform-style: preserve-3d; backface-visibility: hidden;`), glassmorphism filters, and CSS custom property theme swapping. |
+| **Web Audio API** | Audio Feedback | Eliminates external MP3 asset downloads. Synthesizes frequencies programmatically (e.g. 523Hz card flips, 880Hz chime, 220Hz low tone) in real time with zero network overhead. |
+| **Lucide React** | Iconography | Clean, feather-weight SVG icon set matching modern educational design aesthetics. |
+
+---
+
+### 💡 Core Architectural Decisions
+
+1. **Server-Side API Key Protection**:
+   The LLM provider call is routed exclusively through `/api/generate` and `/api/refine`. Even if a client configures their own key via the in-app settings modal, the key is passed inside the POST request body to the serverless function, processed server-side, and never logged or included in bundled client assets.
+2. **Deterministic Fallback Engine**:
+   To ensure immediate evaluation without requiring developers to register API accounts or purchase credits, the backend features an intelligent fallback engine that returns structured, curriculum-accurate study sets for topics like Distributed Systems, Cellular Biology, and Quantum Computing.
+3. **Stale Request Cancellation**:
+   When users rapidly click different topics or submit follow-up prompts, previous network connections are aborted via `AbortController.abort()`. Coupled with a monotonic request counter (`latestRequestIdRef`), late-arriving responses are automatically dropped, preventing out-of-order state corruption.
+4. **Wrong-Answer Sub-Quiz Isolation**:
+   Rather than merely resetting the whole quiz, the application isolates the specific question IDs answered incorrectly into an active subset, recalculates passing scores, and rewards the user with celebratory confetti once 100% mastery is attained.
 
 ---
 
