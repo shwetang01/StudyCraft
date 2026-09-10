@@ -35,7 +35,20 @@ export function useAIGenerator() {
   const latestRequestIdRef = useRef<number>(0);
   const lastSubmittedPromptRef = useRef<string>('');
 
-  // Load persisted session on initial mount
+  // API Key Override: Stored in localStorage and tracked in a ref to prevent stale closures
+  const apiKeyOverrideRef = useRef<{
+    gemini?: string;
+    groq?: string;
+    openai?: string;
+  } | undefined>(undefined);
+
+  const [apiKeyOverride, setApiKeyOverride] = useState<{
+    gemini?: string;
+    groq?: string;
+    openai?: string;
+  } | undefined>(undefined);
+
+  // Load persisted session and API keys on initial mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -44,6 +57,27 @@ export function useAIGenerator() {
       }
     } catch {
       // Ignore corrupted local storage
+    }
+
+    try {
+      const savedKeys = localStorage.getItem('studycraft_api_keys');
+      if (savedKeys) {
+        const parsed = JSON.parse(savedKeys);
+        setApiKeyOverride(parsed);
+        apiKeyOverrideRef.current = parsed;
+      }
+    } catch {
+      // Ignore corrupted keys
+    }
+  }, []);
+
+  const saveApiKeys = useCallback((keys: { gemini?: string; groq?: string; openai?: string }) => {
+    setApiKeyOverride(keys);
+    apiKeyOverrideRef.current = keys;
+    try {
+      localStorage.setItem('studycraft_api_keys', JSON.stringify(keys));
+    } catch {
+      // Ignored
     }
   }, []);
 
@@ -98,7 +132,7 @@ export function useAIGenerator() {
         const payload: GenerateRequestBody = {
           prompt,
           simulationMode,
-          apiKeyOverride,
+          apiKeyOverride: apiKeyOverrideRef.current || apiKeyOverride,
         };
 
         const res = await fetch('/api/generate', {
@@ -164,7 +198,7 @@ export function useAIGenerator() {
           currentSession: session,
           refinementInstruction,
           simulationMode,
-          apiKeyOverride,
+          apiKeyOverride: apiKeyOverrideRef.current || apiKeyOverride,
         };
 
         const res = await fetch('/api/refine', {
@@ -202,7 +236,7 @@ export function useAIGenerator() {
         }
       }
     },
-    [session, persistToHistory]
+    [session, persistToHistory, apiKeyOverride]
   );
 
   const cancelGeneration = useCallback(() => {
@@ -212,31 +246,6 @@ export function useAIGenerator() {
     }
     setIsGenerating(false);
     setIsRefining(false);
-  }, []);
-
-  const [apiKeyOverride, setApiKeyOverride] = useState<{
-    gemini?: string;
-    groq?: string;
-    openai?: string;
-  } | undefined>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = sessionStorage.getItem('studycraft_api_keys');
-        return saved ? JSON.parse(saved) : undefined;
-      } catch {
-        return undefined;
-      }
-    }
-    return undefined;
-  });
-
-  const saveApiKeys = useCallback((keys: { gemini?: string; groq?: string; openai?: string }) => {
-    setApiKeyOverride(keys);
-    try {
-      sessionStorage.setItem('studycraft_api_keys', JSON.stringify(keys));
-    } catch {
-      // Ignored
-    }
   }, []);
 
   const retry = useCallback(() => {

@@ -103,36 +103,56 @@ export async function generateStudySession(
     try {
       const response = await callGeminiApi(prompt, geminiKey, options);
       rawContent = response;
-      modelUsed = 'Google Gemini 2.0 / 1.5 Flash';
+      modelUsed = 'Google Gemini (Live Model)';
     } catch (err) {
-      console.warn('Gemini API call failed, falling back to intelligent generator:', err);
-      rawContent = generateRealisticMockResponse(prompt, options);
-      modelUsed = 'Intelligent Fallback Engine (Gemini Quota/Error)';
+      console.error('Gemini API call failed:', err);
+      const errMsg = (err as Error).message || 'Failed to call Gemini API';
+      return {
+        success: false,
+        error: {
+          code: 'GEMINI_API_ERROR',
+          message: `Google Gemini API Error: ${errMsg}. Please check your API key in the Key settings (🔑) or verify your Google AI Studio quota.`,
+          canAutoRepair: false,
+        },
+      };
     }
   } else if (groqKey) {
     try {
       const response = await callGroqApi(prompt, groqKey, options);
       rawContent = response;
-      modelUsed = 'Groq Llama-3.3-70b';
+      modelUsed = 'Groq Llama-3.3-70b (Live Model)';
     } catch (err) {
-      console.warn('Groq API call failed, falling back to intelligent generator:', err);
-      rawContent = generateRealisticMockResponse(prompt, options);
-      modelUsed = 'Intelligent Fallback Engine (Groq Error)';
+      console.error('Groq API call failed:', err);
+      const errMsg = (err as Error).message || 'Failed to call Groq API';
+      return {
+        success: false,
+        error: {
+          code: 'GROQ_API_ERROR',
+          message: `Groq API Error: ${errMsg}. Please verify your Groq API key in the Key settings (🔑).`,
+          canAutoRepair: false,
+        },
+      };
     }
   } else if (openaiKey) {
     try {
       const response = await callOpenAiApi(prompt, openaiKey, options);
       rawContent = response;
-      modelUsed = 'OpenAI GPT-4o-mini';
+      modelUsed = 'OpenAI GPT-4o-mini (Live Model)';
     } catch (err) {
-      console.warn('OpenAI API call failed, falling back to intelligent generator:', err);
-      rawContent = generateRealisticMockResponse(prompt, options);
-      modelUsed = 'Intelligent Fallback Engine (OpenAI Error)';
+      console.error('OpenAI API call failed:', err);
+      const errMsg = (err as Error).message || 'Failed to call OpenAI API';
+      return {
+        success: false,
+        error: {
+          code: 'OPENAI_API_ERROR',
+          message: `OpenAI API Error: ${errMsg}. Please verify your OpenAI API key in the Key settings (🔑).`,
+          canAutoRepair: false,
+        },
+      };
     }
   } else {
     // Zero-config instant mock generator (provides rich real-time experience out of the box)
-    // Small artificial delay for natural UX feeling (800ms)
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    await new Promise((resolve) => setTimeout(resolve, 600));
     rawContent = generateRealisticMockResponse(prompt, options);
   }
 
@@ -276,35 +296,49 @@ Return the updated complete JSON object strictly matching the schema.
 // ================= API CALL IMPLEMENTATIONS =================
 
 async function callGeminiApi(prompt: string, apiKey: string, options?: GenerateRequestBody['options']): Promise<string> {
-  // Using Gemini REST API with system instructions
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  // Using Gemini REST API with fallback between gemini-1.5-flash and gemini-2.0-flash
+  const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+  let lastErrorMsg = '';
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: `${SYSTEM_PROMPT}\n\nUser Input / Topic / Notes:\n${prompt}` }],
-        },
-      ],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.3,
-      },
-    }),
-  });
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${SYSTEM_PROMPT}\n\nUser Input / Topic / Notes:\n${prompt}` }],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.3,
+          },
+        }),
+      });
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini API error (${response.status}): ${errText}`);
+      if (response.ok) {
+        const json = await response.json();
+        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+      } else {
+        const errText = await response.text();
+        lastErrorMsg = `[${model}] (${response.status}): ${errText}`;
+        // If the key itself is invalid, abort further model attempts
+        if (errText.includes('API_KEY_INVALID') || (response.status === 400 && errText.includes('API key not valid'))) {
+          throw new Error('API key not valid. Please check your Google Gemini key in AI Studio.');
+        }
+      }
+    } catch (err) {
+      if ((err as Error).message.includes('API key not valid')) throw err;
+      lastErrorMsg = (err as Error).message;
+    }
   }
 
-  const json = await response.json();
-  const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('Empty text candidate received from Gemini');
-  return text;
+  throw new Error(`Google Gemini failed across endpoints: ${lastErrorMsg}`);
 }
 
 async function callGroqApi(prompt: string, apiKey: string, options?: GenerateRequestBody['options']): Promise<string> {
@@ -364,10 +398,9 @@ async function callOpenAiApi(prompt: string, apiKey: string, options?: GenerateR
 // ================= INTELLIGENT MOCK / FALLBACK ENGINE =================
 
 function generateRealisticMockResponse(prompt: string, options?: GenerateRequestBody['options']): string {
-  const lower = prompt.toLowerCase();
-
-  // 1. Photosynthesis & Biology
-  if (lower.includes('photo') || lower.includes('cell') || lower.includes('bio') || lower.includes('plant')) {
+  // 1. Photosynthesis & Biology (only match explicit biology terms)
+  const isPhotosynthesis = /\b(photosynthesis|chloroplast|chlorophyll|thylakoid|calvin cycle|photolysis)\b/i.test(prompt);
+  if (isPhotosynthesis) {
     return JSON.stringify({
       title: 'Photosynthesis & Cellular Respiration Mastery Guide',
       topic: 'Cellular Biology & Bioenergetics',
@@ -419,8 +452,9 @@ function generateRealisticMockResponse(prompt: string, options?: GenerateRequest
     });
   }
 
-  // 2. System Design & Distributed Systems / Computer Science
-  if (lower.includes('system') || lower.includes('cach') || lower.includes('database') || lower.includes('distribut') || lower.includes('api') || lower.includes('network')) {
+  // 2. System Design & Distributed Systems (only match explicit architectural phrases)
+  const isDistributedSystems = /\b(distributed system|caching architecture|cap theorem|cache stampede|consistent hashing)\b/i.test(prompt);
+  if (isDistributedSystems) {
     return JSON.stringify({
       title: 'Distributed Systems & Caching Architecture',
       topic: 'Computer Science & System Design',
@@ -472,65 +506,74 @@ function generateRealisticMockResponse(prompt: string, options?: GenerateRequest
     });
   }
 
-  // 3. Generic Dynamic Generator for any custom text/topic
-  const cleanTopic = prompt.split('\n')[0].replace(/[^a-zA-Z0-9 ]/g, '').trim().slice(0, 40) || 'Custom Notes';
-  const sentences = prompt.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 10);
-  const firstSentence = sentences[0] || `An exploration of ${cleanTopic} and fundamental principles.`;
-  const secondSentence = sentences[1] || `Key paradigms, mechanics, and practical applications of ${cleanTopic}.`;
+  // 3. Generic Dynamic Generator for any custom text/topic:
+  // Extracts actual sentences, facts, and terms directly from the user's input notes!
+  const lines = prompt.split('\n').map((l) => l.trim()).filter(Boolean);
+  const cleanTopic = lines[0]?.replace(/[^a-zA-Z0-9 ]/g, '').trim().slice(0, 45) || 'Custom Notes';
+  const sentences = prompt
+    .split(/[.!?\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 8);
+
+  const s1 = sentences[0] || `${cleanTopic} establishes the foundational principles of the subject.`;
+  const s2 = sentences[1] || `Key paradigms and operational mechanics define how ${cleanTopic} operates in practice.`;
+  const s3 = sentences[2] || `Practical implementations of ${cleanTopic} address edge cases and structural constraints.`;
+  const s4 = sentences[3] || `Understanding the interconnections within ${cleanTopic} enables diagnostic and theoretical mastery.`;
+  const s5 = sentences[4] || `Iterative testing and active recall reinforce long-term comprehension of ${cleanTopic}.`;
 
   return JSON.stringify({
     title: `${cleanTopic} Study Accelerator`,
     topic: cleanTopic,
-    summary: `Structured review session based on your custom notes regarding ${cleanTopic}. Master key terminology, internal relationships, and test your recall with interactive self-assessment.`,
+    summary: `Curated study package synthesized directly from your custom notes on "${cleanTopic}". Review key statements, test your retention, and explore critical relationships.`,
     keyConcepts: [
-      { id: 'c1', concept: `Foundation of ${cleanTopic}`, summary: firstSentence },
-      { id: 'c2', concept: 'Core Mechanics & Dynamics', summary: secondSentence },
-      { id: 'c3', concept: 'Critical Applications & Edge Cases', summary: `Recognizing boundary constraints, exceptions, and key patterns in ${cleanTopic}.` },
-      { id: 'c4', concept: 'Synthesis & Best Practices', summary: `Consolidating the theoretical frameworks into reliable, actionable understanding.` }
+      { id: 'c1', concept: `Foundation: ${cleanTopic}`, summary: s1 },
+      { id: 'c2', concept: 'Core Dynamics', summary: s2 },
+      { id: 'c3', concept: 'Operational Mechanics', summary: s3 },
+      { id: 'c4', concept: 'Application & Synthesis', summary: s4 }
     ],
     flashcards: [
-      { id: 'fc1', front: `What is the core premise of ${cleanTopic}?`, back: firstSentence, category: 'Fundamentals', difficulty: 'easy' },
-      { id: 'fc2', front: `Why is understanding ${cleanTopic} critical?`, back: secondSentence, category: 'Application', difficulty: 'medium' },
-      { id: 'fc3', front: `What is a common misconception regarding ${cleanTopic}?`, back: 'Assuming surface familiarity equals deep conceptual mastery; nuances emerge during edge cases and active recall.', category: 'Critical Thinking', difficulty: 'medium' },
-      { id: 'fc4', front: `How do you measure mastery in ${cleanTopic}?`, back: 'The ability to explain the underlying mechanisms from first principles without relying on rote memorization.', category: 'Evaluation', difficulty: 'hard' },
-      { id: 'fc5', front: `What are the primary components of ${cleanTopic}?`, back: 'The foundational axioms, operational rules, and systematic feedback loops outlined in the source notes.', category: 'Architecture', difficulty: 'medium' }
+      { id: 'fc1', front: `What is the core premise of ${cleanTopic}?`, back: s1, category: 'Core Principles', difficulty: 'easy' },
+      { id: 'fc2', front: `How do key dynamics operate in ${cleanTopic}?`, back: s2, category: 'Mechanics', difficulty: 'medium' },
+      { id: 'fc3', front: `What critical application or constraint applies to ${cleanTopic}?`, back: s3, category: 'Practical Context', difficulty: 'medium' },
+      { id: 'fc4', front: `What is an essential insight regarding ${cleanTopic}?`, back: s4, category: 'Deep Understanding', difficulty: 'hard' },
+      { id: 'fc5', front: `How is mastery verified in ${cleanTopic}?`, back: s5, category: 'Evaluation', difficulty: 'hard' }
     ],
     quiz: [
       {
         id: 'q1',
-        question: `According to the source material, which statement best characterizes ${cleanTopic}?`,
+        question: `According to your notes, which statement directly describes ${cleanTopic}?`,
         options: [
-          firstSentence.slice(0, 70),
-          `It operates independently of any surrounding contextual conditions.`,
-          `It is primarily an outdated historical convention with no modern utility.`,
-          `It requires complete manual recalculation at every operational step.`
+          s1.slice(0, 80),
+          `It operates without any governing rules or contextual conditions.`,
+          `It was proven obsolete in modern educational and technical applications.`,
+          `It eliminates the need for any structured study or evaluation.`
         ],
         correctAnswerIndex: 0,
-        explanation: `The foundational notes emphasize: "${firstSentence.slice(0, 100)}"`
+        explanation: `Your source notes emphasize: "${s1.slice(0, 120)}"`
       },
       {
         id: 'q2',
-        question: `Which factor is most vital when implementing or analyzing ${cleanTopic}?`,
+        question: `Which dynamic is highlighted in the study material for ${cleanTopic}?`,
         options: [
-          'Ensuring strict adherence to verified core principles and structural coherence',
-          'Maximizing unnecessary complexity to impress external observers',
-          'Ignoring edge cases and assuming average conditions will always hold',
-          'Deleting all documentation to save storage space'
+          s2.slice(0, 80),
+          'Arbitrary variance should be introduced at every stage of execution.',
+          'All parameters must remain strictly static regardless of environment.',
+          'Documentation should be discarded after initial review.'
         ],
         correctAnswerIndex: 0,
-        explanation: 'Effective study and real-world execution require coherent understanding of core rules and careful handling of constraints.'
+        explanation: `The source material specifies: "${s2.slice(0, 120)}"`
       },
       {
         id: 'q3',
-        question: `What distinguishes an advanced practitioner of ${cleanTopic} from a beginner?`,
+        question: `What practical condition or pattern is emphasized regarding ${cleanTopic}?`,
         options: [
-          'The ability to diagnose root causes and adapt to unexpected deviations',
-          'Memorizing raw terms without understanding how they interact',
-          'Avoiding all practice quizzes and hands-on testing',
-          'Never revising or updating prior assumptions'
+          s3.slice(0, 80),
+          'Only external assumptions are evaluated, ignoring internal mechanics.',
+          'Edge cases never occur in realistic real-world conditions.',
+          'Systemic analysis is discouraged in favor of superficial memorization.'
         ],
         correctAnswerIndex: 0,
-        explanation: 'Deep domain competence is proven through active problem solving, diagnostic capability, and iterative refinement.'
+        explanation: `Referenced directly from notes: "${s3.slice(0, 120)}"`
       }
     ]
   });
