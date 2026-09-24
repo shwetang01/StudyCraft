@@ -182,7 +182,7 @@ StudyCraft is structured as a **decoupled, event-driven React client with a resi
 ### 📂 Directory Structure & Module Responsibilities
 
 ```
-Flam_Frontend/
+StudyCraft/
 ├── public/
 │   └── demo_recording.webp       # Demonstration recording for evaluators
 ├── src/

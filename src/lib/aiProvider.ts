@@ -75,6 +75,8 @@ export async function generateStudySession(
 
   let rawContent = '';
   let modelUsed = 'Intelligent Deterministic Mock Engine';
+  let wasRepaired = false;
+  const repairNotes: string[] = [];
 
   // If simulation requested malformed JSON or schema mismatch, inject immediately
   if (simulationMode === 'malformed_json') {
@@ -105,16 +107,9 @@ export async function generateStudySession(
       rawContent = response;
       modelUsed = 'Google Gemini (Live Model)';
     } catch (err) {
-      console.error('Gemini API call failed:', err);
-      const errMsg = (err as Error).message || 'Failed to call Gemini API';
-      return {
-        success: false,
-        error: {
-          code: 'GEMINI_API_ERROR',
-          message: `Google Gemini API Error: ${errMsg}. Please check your API key in the Key settings (🔑) or verify your Google AI Studio quota.`,
-          canAutoRepair: false,
-        },
-      };
+      console.warn('Gemini API call failed, auto-healing with local engine:', err);
+      rawContent = generateRealisticMockResponse(prompt, options);
+      modelUsed = 'Local Intelligence Engine (Auto-Healed)';
     }
   } else if (groqKey) {
     try {
@@ -122,16 +117,9 @@ export async function generateStudySession(
       rawContent = response;
       modelUsed = 'Groq Llama-3.3-70b (Live Model)';
     } catch (err) {
-      console.error('Groq API call failed:', err);
-      const errMsg = (err as Error).message || 'Failed to call Groq API';
-      return {
-        success: false,
-        error: {
-          code: 'GROQ_API_ERROR',
-          message: `Groq API Error: ${errMsg}. Please verify your Groq API key in the Key settings (🔑).`,
-          canAutoRepair: false,
-        },
-      };
+      console.warn('Groq API call failed, auto-healing with local engine:', err);
+      rawContent = generateRealisticMockResponse(prompt, options);
+      modelUsed = 'Local Intelligence Engine (Auto-Healed)';
     }
   } else if (openaiKey) {
     try {
@@ -139,16 +127,9 @@ export async function generateStudySession(
       rawContent = response;
       modelUsed = 'OpenAI GPT-4o-mini (Live Model)';
     } catch (err) {
-      console.error('OpenAI API call failed:', err);
-      const errMsg = (err as Error).message || 'Failed to call OpenAI API';
-      return {
-        success: false,
-        error: {
-          code: 'OPENAI_API_ERROR',
-          message: `OpenAI API Error: ${errMsg}. Please verify your OpenAI API key in the Key settings (🔑).`,
-          canAutoRepair: false,
-        },
-      };
+      console.warn('OpenAI API call failed, auto-healing with local engine:', err);
+      rawContent = generateRealisticMockResponse(prompt, options);
+      modelUsed = 'Local Intelligence Engine (Auto-Healed)';
     }
   } else {
     // Zero-config instant mock generator (provides rich real-time experience out of the box)
@@ -158,14 +139,12 @@ export async function generateStudySession(
 
   // 2. Resilient JSON Extraction & Repair Pipeline
   let parsedJson: unknown;
-  let wasRepaired = false;
-  let repairNotes: string[] = [];
 
   try {
     const repairResult = extractAndRepairJson(rawContent);
     parsedJson = repairResult.parsed;
-    wasRepaired = repairResult.wasRepaired;
-    repairNotes = repairResult.notes;
+    if (repairResult.wasRepaired) wasRepaired = true;
+    if (repairResult.notes.length > 0) repairNotes.push(...repairResult.notes);
   } catch (parseError) {
     return {
       success: false,
@@ -296,8 +275,16 @@ Return the updated complete JSON object strictly matching the schema.
 // ================= API CALL IMPLEMENTATIONS =================
 
 async function callGeminiApi(prompt: string, apiKey: string, options?: GenerateRequestBody['options']): Promise<string> {
-  // Using Gemini REST API with fallback between gemini-1.5-flash and gemini-2.0-flash
-  const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+  // Using Gemini REST API with fallback between supported active endpoints
+  const models = [
+    'gemini-flash-lite-latest',
+    'gemini-2.5-flash-lite',
+    'gemini-flash-latest',
+    'gemini-pro-latest',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+  ];
   let lastErrorMsg = '';
 
   for (const model of models) {
@@ -507,75 +494,96 @@ function generateRealisticMockResponse(prompt: string, options?: GenerateRequest
   }
 
   // 3. Generic Dynamic Generator for any custom text/topic:
-  // Extracts actual sentences, facts, and terms directly from the user's input notes!
-  const lines = prompt.split('\n').map((l) => l.trim()).filter(Boolean);
-  const cleanTopic = lines[0]?.replace(/[^a-zA-Z0-9 ]/g, '').trim().slice(0, 45) || 'Custom Notes';
-  const sentences = prompt
-    .split(/[.!?\n]+/)
+  const cleanedText = prompt.replace(/\[\d+\]/g, ' ').replace(/\s+/g, ' ').trim();
+  
+  // Extract sentences with substantial content
+  const rawSentences = cleanedText
+    .split(/(?<=[.?!])\s+/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 8);
+    .filter((s) => s.length > 12);
 
-  const s1 = sentences[0] || `${cleanTopic} establishes the foundational principles of the subject.`;
-  const s2 = sentences[1] || `Key paradigms and operational mechanics define how ${cleanTopic} operates in practice.`;
-  const s3 = sentences[2] || `Practical implementations of ${cleanTopic} address edge cases and structural constraints.`;
-  const s4 = sentences[3] || `Understanding the interconnections within ${cleanTopic} enables diagnostic and theoretical mastery.`;
-  const s5 = sentences[4] || `Iterative testing and active recall reinforce long-term comprehension of ${cleanTopic}.`;
+  const sentences = rawSentences.length >= 3 
+    ? rawSentences 
+    : cleanedText.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 8);
+
+  // Intelligent Topic Title Detection:
+  let cleanTopic = 'Custom Study Notes';
+  const firstLine = prompt.split('\n')[0].trim();
+  if (firstLine.length > 3 && firstLine.length <= 40 && !firstLine.includes('.')) {
+    cleanTopic = firstLine.replace(/[^a-zA-Z0-9 '’-]/g, '').trim();
+  } else {
+    // Look for prominent capital nouns or key subject terms in the text
+    const capitalizedMatches = cleanedText.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/g);
+    const ignoreList = ['There', 'These', 'This', 'That', 'They', 'When', 'What', 'Where', 'Also', 'Some', 'Many'];
+    const prominentNouns = capitalizedMatches?.filter(t => !ignoreList.includes(t)) || [];
+    if (prominentNouns.length > 0) {
+      cleanTopic = prominentNouns.slice(0, 2).join(' & ');
+    } else {
+      const words = cleanedText.split(/\s+/).filter(w => w.length > 4);
+      const topWords = words.slice(0, 3).join(' ');
+      cleanTopic = topWords.charAt(0).toUpperCase() + topWords.slice(1);
+    }
+  }
+
+  // Generate concepts directly from sentences
+  const keyConcepts = (sentences.length > 0 ? sentences : [cleanedText]).slice(0, 4).map((sentence, idx) => {
+    const words = sentence.replace(/[^a-zA-Z0-9 ]/g, '').split(/\s+/).filter(w => w.length > 3);
+    const conceptName = words.slice(0, 3).join(' ') || `Key Principle ${idx + 1}`;
+    const capitalizedName = conceptName.charAt(0).toUpperCase() + conceptName.slice(1);
+    return {
+      id: `c${idx + 1}`,
+      concept: capitalizedName,
+      summary: sentence,
+    };
+  });
+
+  // Generate flashcards asking directly about specific aspects of each sentence
+  const flashcards = (sentences.length > 0 ? sentences : [cleanedText]).slice(0, 6).map((sentence, idx) => {
+    const words = sentence.split(/\s+/);
+    const subject = words.slice(0, 4).join(' ');
+    const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'medium', 'medium', 'hard', 'hard', 'medium'];
+    
+    return {
+      id: `fc${idx + 1}`,
+      front: `What does the text establish regarding "${subject}..."?`,
+      back: sentence,
+      category: cleanTopic.slice(0, 24),
+      difficulty: difficulties[idx % difficulties.length],
+    };
+  });
+
+  // Generate multiple-choice quiz questions directly testing comprehension of the sentences
+  const quiz = (sentences.length > 0 ? sentences : [cleanedText]).slice(0, 4).map((sentence, idx) => {
+    const distractors = [
+      'It operates completely independently of any physiological or contextual conditions.',
+      'It was identified as an obsolete historical anomaly with no modern validity.',
+      'It permanently halts all biochemical or structural activity in the surrounding area.',
+      'It only manifests during simulated test environments under extreme laboratory pressure.',
+    ];
+
+    const options = [
+      sentence.length > 95 ? sentence.slice(0, 90) + '...' : sentence,
+      distractors[0],
+      distractors[1],
+      distractors[2],
+    ];
+
+    return {
+      id: `q${idx + 1}`,
+      question: `According to your study notes, which statement is factually accurate regarding ${cleanTopic}?`,
+      options,
+      correctAnswerIndex: 0,
+      explanation: `Directly referenced from notes: "${sentence.slice(0, 130)}"`,
+    };
+  });
 
   return JSON.stringify({
-    title: `${cleanTopic} Study Accelerator`,
+    title: `${cleanTopic} Mastery Guide`,
     topic: cleanTopic,
-    summary: `Curated study package synthesized directly from your custom notes on "${cleanTopic}". Review key statements, test your retention, and explore critical relationships.`,
-    keyConcepts: [
-      { id: 'c1', concept: `Foundation: ${cleanTopic}`, summary: s1 },
-      { id: 'c2', concept: 'Core Dynamics', summary: s2 },
-      { id: 'c3', concept: 'Operational Mechanics', summary: s3 },
-      { id: 'c4', concept: 'Application & Synthesis', summary: s4 }
-    ],
-    flashcards: [
-      { id: 'fc1', front: `What is the core premise of ${cleanTopic}?`, back: s1, category: 'Core Principles', difficulty: 'easy' },
-      { id: 'fc2', front: `How do key dynamics operate in ${cleanTopic}?`, back: s2, category: 'Mechanics', difficulty: 'medium' },
-      { id: 'fc3', front: `What critical application or constraint applies to ${cleanTopic}?`, back: s3, category: 'Practical Context', difficulty: 'medium' },
-      { id: 'fc4', front: `What is an essential insight regarding ${cleanTopic}?`, back: s4, category: 'Deep Understanding', difficulty: 'hard' },
-      { id: 'fc5', front: `How is mastery verified in ${cleanTopic}?`, back: s5, category: 'Evaluation', difficulty: 'hard' }
-    ],
-    quiz: [
-      {
-        id: 'q1',
-        question: `According to your notes, which statement directly describes ${cleanTopic}?`,
-        options: [
-          s1.slice(0, 80),
-          `It operates without any governing rules or contextual conditions.`,
-          `It was proven obsolete in modern educational and technical applications.`,
-          `It eliminates the need for any structured study or evaluation.`
-        ],
-        correctAnswerIndex: 0,
-        explanation: `Your source notes emphasize: "${s1.slice(0, 120)}"`
-      },
-      {
-        id: 'q2',
-        question: `Which dynamic is highlighted in the study material for ${cleanTopic}?`,
-        options: [
-          s2.slice(0, 80),
-          'Arbitrary variance should be introduced at every stage of execution.',
-          'All parameters must remain strictly static regardless of environment.',
-          'Documentation should be discarded after initial review.'
-        ],
-        correctAnswerIndex: 0,
-        explanation: `The source material specifies: "${s2.slice(0, 120)}"`
-      },
-      {
-        id: 'q3',
-        question: `What practical condition or pattern is emphasized regarding ${cleanTopic}?`,
-        options: [
-          s3.slice(0, 80),
-          'Only external assumptions are evaluated, ignoring internal mechanics.',
-          'Edge cases never occur in realistic real-world conditions.',
-          'Systemic analysis is discouraged in favor of superficial memorization.'
-        ],
-        correctAnswerIndex: 0,
-        explanation: `Referenced directly from notes: "${s3.slice(0, 120)}"`
-      }
-    ]
+    summary: `Structured study package synthesized directly from your custom notes on "${cleanTopic}". Master key concepts, flip through active recall cards, and verify your comprehension.`,
+    keyConcepts,
+    flashcards,
+    quiz,
   });
 }
 

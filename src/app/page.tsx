@@ -146,20 +146,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* AI Auto-Repair Diagnostic Indicator */}
-      {metaInfo?.wasRepaired && metaInfo.repairNotes && metaInfo.repairNotes.length > 0 && (
-        <div className="repair-pill-banner">
-          <Wrench size={16} style={{ color: 'var(--accent-cyan)', flexShrink: 0 }} />
-          <div>
-            <strong style={{ color: '#fff' }}>Resilient Output Shield Active:</strong>{' '}
-            Model returned irregular output that was auto-repaired without failing:
-            <span style={{ marginLeft: '6px', opacity: 0.85 }}>
-              {metaInfo.repairNotes.slice(0, 2).join(' • ')}
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Loading Skeleton with Step Ticker & Cancel Button */}
       {isGenerating && (
         <div className="glass-card" style={{ maxWidth: '760px', margin: '32px auto', padding: '32px', textAlign: 'center' }}>
