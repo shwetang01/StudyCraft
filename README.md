@@ -2,7 +2,7 @@
 
 > An interactive, resilient learning platform that converts free-form notes and topics into 3D interactive flashcards, adaptive self-testing quizzes with wrong-answer retesting, and mastery checklists. Built to demonstrate resilient UI architecture over unpredictable AI outputs.
 
-Built for the **Frontend Internship Assignment** (Flam).
+
 
 ---
 
