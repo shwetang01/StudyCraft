@@ -6,15 +6,10 @@
 
 ---
 
-## 📹 Screen Recording Demonstration
-
-Per the assignment submission instructions (*"A short screen recording showing the app working"*), a complete animated walkthrough demonstration of the finished application is embedded below and included directly in this repository:
-
-![StudyCraft Interactive Walkthrough Demo](./demo_recording.webp)
-
-*(The demonstration showcases: Dark/Light mode toggle with high-contrast text, the streamlined consumer header, topic synthesis, 3D perspective card flips, keyboard-assisted quiz evaluation with immediate explanations, and the Multi-Block continuous canvas view).*
-
-▶️ **[Direct File Link: demo_recording.webp](./demo_recording.webp)**
+# 📺 Project Walkthrough & Demo
+Watch the complete project walkthrough showcasing the features, architecture, and live generation:
+[![Watch Project Walkthrough](https://img.shields.io/badge/▶%20Watch%20Walkthrough-Google%20Drive-blue?style=for-the-badge&logo=google-drive)](https://drive.google.com/file/d/1qLuUkuIxjT2eCz9fWh9JqDtUJ4C5hy7h/view?usp=sharing)
+🔗 **Direct Video Link:** [Click here to view the Walkthrough on Google Drive](https://drive.google.com/file/d/1qLuUkuIxjT2eCz9fWh9JqDtUJ4C5hy7h/view?usp=sharing)
 
 ---
 
